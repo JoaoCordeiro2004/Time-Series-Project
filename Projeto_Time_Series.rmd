@@ -1,0 +1,7 @@
+# Time Series Project 2026
+
+This is the code document used to do the time series analysis in the context of the
+project from the Time Series course on IST-UL.
+The authors are João Cordeiro (ist1107480) and Susana Ferreira (ist59482).
+
+A SEGUIR O MARKDOWN SERÁ DIVIDIDO POR CADA SECÇÃO QUE FOI CONSIDERADA NO RELATÓRIO DO PROJETO
