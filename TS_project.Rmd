@@ -2,39 +2,44 @@
 title: "Project Time series"
 output: html_document
 date: "2026-04-15"
+editor_options: 
+  markdown: 
+    wrap: 72
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+This is the code document used to do the time series analysis in the
+context of the project from the Time Series course on IST-UL. The
+authors are João Cordeiro (ist1107480) and Susana Ferreira (ist59482).
 
-This is the code document used to do the time series analysis in the context of the
-project from the Time Series course on IST-UL.
-The authors are João Cordeiro (ist1107480) and Susana Ferreira (ist59482).
+# Assignment 1
 
-#Assignment 1
-Southern Oscillation Index (SOI) since 1876
-Monthly data
+## Southern Oscillation Index (SOI) since 2010 monthly data
 
 ```{r}
-SOI <- read.csv("C:/Users/X1605/OneDrive - IPLeiria/Ano_letivo_2025_26/master_ist/Time_Series_Analysis/project/Time Series SOI 2010-2025.txt", header=FALSE)
+url <- "https://raw.githubusercontent.com/JoaoCordeiro2004/Time-Series-Project/refs/heads/main/Time%20Series%20SOI%202010-2025.txt"
+
+SOI <- read.csv(url, header = FALSE)
 ```
 
-Data YYYYMM - convert format
+The first transformations we do with the raw data is to convert the data
+to an actual data format and create column names for the data frame.
+
 ```{r}
 colnames(SOI) <- c("date", "soi")
 SOI$date <- as.Date(paste0(SOI$date, "01"), format = "%Y%m%d")
 ```
-Create TS
+
+Afterwards, we create the time series for the data and plot it.
+
 ```{r}
 soi_ts <- ts(SOI$soi,
              start = c(2010, 1),
              frequency = 12)
 ```
-
-Plot
-
 
 ```{r}
 plot(SOI$date, SOI$soi,
@@ -44,19 +49,61 @@ plot(SOI$date, SOI$soi,
      ylab = "SOI",
      col = "blue")
 ```
-Fit to a SARIMA(p,d,q)(P,D,Q)_s model (ARIMA including seasonality). By above plot, seems that there is not a trend, just seasonality and cyclic. Even so, we can use stl to separate in this 3 components.it seems also stationary.
+
+Next, we handle the missing values in the Time Series
+
 ```{r}
-stl_fit <- stl(soi_ts, s.window = "periodic")
-plot(stl_fit)
-```
-Check stationarity
-```{r}
-library(tseries)
-adf.test(soi_ts)
+install.packages("imputeTS")
+library(imputeTS)
+
+ggplot_na_distribution(soi_ts)
 ```
 
-By Augmented Dickey-Fuller test, there is no evidence to reject H0, no stationarity 
-Apply differences
+As we can see by the graph there are no missing values for this
+particular Time Series, therefore there was no need to impute the gaps.
+
+With the time series being compeletly clean, we want to fit a SARIMA
+model to be able to do a forecast. We proceed to decompose it into its
+Seasonal, Trend and Residual components. As per usual, we assume the
+cyclical component to be zero.
+
+```{r}
+stl_soi <- stl(soi_ts, s.window = "per")
+
+plot(stl_soi)
+```
+
+### Analysis of the Remainder Component
+
+Having performed the STL decomposition, we can extract the remainder
+component of the SOI time series. The goal is to fit a SARIMA model to
+it.
+
+```{r}
+soi_rem <- stl_soi$time.series[,3]
+
+plot(soi_rem)
+```
+
+Before proceding, we need to check if this time series is stationary.
+Otherwise, we couldn't proceed with the modelling.
+
+```{r}
+library(tseries)
+adf.test(soi_rem)
+kpss.test(soi_rem)
+```
+
+By Augmented Dickey-Fuller test (null hypothesis states that it is not
+stationary) and the KPSS test (null hypothesis states that the TS is
+stationary) we work with the hypothesis that the remainder component is
+stationary.
+
+A SEGUIR DAR PLOT DAS ACF E PACF E TIRAR CONCLUSÕES. EXPLICAR NO
+RELATÓRIO TUDO DEPOIS!!!!
+
+--------------------------------------------------------------------------------------
+
 ```{r}
 diff1 <- diff(soi_ts, differences = 1)
 
@@ -68,14 +115,13 @@ plot(diff_seasonal)
 adf.test(diff_seasonal)
 ```
 
-
 ```{r}
 acf(diff_seasonal)
 pacf(diff_seasonal)
 ```
-lag 1 -> positive to autocorrelation 
-ACF spikes->  suggest MA(q) or MA(Q)
-PACF spikes -> suggest AR(p) or AR(P)
+
+lag 1 -\> positive to autocorrelation ACF spikes-\> suggest MA(q) or
+MA(Q) PACF spikes -\> suggest AR(p) or AR(P)
 
 ```{r}
 library(forecast)
@@ -84,23 +130,29 @@ model_sarima <- auto.arima(soi_ts)
 summary(model_sarima)
 ```
 
-Diagnostic checking: 
-No autocorrelation in residuals (ACF) -> white noise
-Ljung-Box test p-value > 0.05
-data:  Residuals from ARIMA(1,0,1) with zero mean
-Q* = 16.228, df = 22, p-value = 0.8044
-Model df: 2.   Total lags used: 24
+Diagnostic checking: No autocorrelation in residuals (ACF) -\> white
+noise Ljung-Box test p-value \> 0.05 data: Residuals from ARIMA(1,0,1)
+with zero mean Q\* = 16.228, df = 22, p-value = 0.8044 Model df: 2.
+Total lags used: 24
 
-The Ljung-Box test is a statistical diagnostic tool used in time series analysis to determine if residuals from a fitted model (ARIMA) are independently distributed, meaning they exhibit no significant autocorrelation, or if they behave as white noise. It tests the overall randomness of the data across multiple lags rather than a single lag
-{\displaystyle H_{0}}: The data is not correlated (i.e. the correlations in the population from which the sample is taken are 0, so that any observed correlations in the data result from randomness of the sampling process).
-{\displaystyle H_{a}}: The data exhibit serial correlation.
+The Ljung-Box test is a statistical diagnostic tool used in time series
+analysis to determine if residuals from a fitted model (ARIMA) are
+independently distributed, meaning they exhibit no significant
+autocorrelation, or if they behave as white noise. It tests the overall
+randomness of the data across multiple lags rather than a single lag
+{\displaystyle H\_{0}}: The data is not correlated (i.e. the
+correlations in the population from which the sample is taken are 0, so
+that any observed correlations in the data result from randomness of the
+sampling process). {\displaystyle H\_{a}}: The data exhibit serial
+correlation.
+
 ```{r}
 checkresiduals(model_sarima)
 ```
 
-
-After deciding on appropriate models, forecast the data into the future up to 5 time periods
-ahead and calculate 95% prediction intervals for each of the 5 forecasts.
+After deciding on appropriate models, forecast the data into the future
+up to 5 time periods ahead and calculate 95% prediction intervals for
+each of the 5 forecasts.
 
 ```{r}
 forecast_5 <- forecast(model_sarima, h = 5, level = 95)
@@ -110,8 +162,8 @@ plot(forecast_5,
      xlab = "Time")
 ```
 
+# Assigment 2
 
-#Assigment 2
 ```{r}
 library(readxl)
 
@@ -142,8 +194,7 @@ Navigator<-read_excel(
 
 ```
 
-
-# log-returns associated to teh daily closing valuesfor the 4 TS
+## Log-returns associated to the daily closing values for the 4 TS
 
 ```{r}
 library(dplyr)
@@ -152,9 +203,3 @@ EDP <- EDP %>%
   arrange(Date) %>% 
   mutate(log_return = log(Close / lag(Close)))
 ```
-
-
-
-
-
-
