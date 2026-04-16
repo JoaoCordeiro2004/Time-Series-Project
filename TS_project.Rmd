@@ -1,0 +1,160 @@
+---
+title: "Project Time series"
+output: html_document
+date: "2026-04-15"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+This is the code document used to do the time series analysis in the context of the
+project from the Time Series course on IST-UL.
+The authors are João Cordeiro (ist1107480) and Susana Ferreira (ist59482).
+
+#Assignment 1
+Southern Oscillation Index (SOI) since 1876
+Monthly data
+
+```{r}
+SOI <- read.csv("C:/Users/X1605/OneDrive - IPLeiria/Ano_letivo_2025_26/master_ist/Time_Series_Analysis/project/Time Series SOI 2010-2025.txt", header=FALSE)
+```
+
+Data YYYYMM - convert format
+```{r}
+colnames(SOI) <- c("date", "soi")
+SOI$date <- as.Date(paste0(SOI$date, "01"), format = "%Y%m%d")
+```
+Create TS
+```{r}
+soi_ts <- ts(SOI$soi,
+             start = c(2010, 1),
+             frequency = 12)
+```
+
+Plot
+
+
+```{r}
+plot(SOI$date, SOI$soi,
+     type = "l",
+     main = "Southern Oscillation Index (SOI)",
+     xlab = "Time",
+     ylab = "SOI",
+     col = "blue")
+```
+Fit to a SARIMA(p,d,q)(P,D,Q)_s model (ARIMA including seasonality). By above plot, seems that there is not a trend, just seasonality and cyclic. Even so, we can use stl to separate in this 3 components.it seems also stationary.
+```{r}
+stl_fit <- stl(soi_ts, s.window = "periodic")
+plot(stl_fit)
+```
+Check stationarity
+```{r}
+library(tseries)
+adf.test(soi_ts)
+```
+
+By Augmented Dickey-Fuller test, there is no evidence to reject H0, no stationarity 
+Apply differences
+```{r}
+diff1 <- diff(soi_ts, differences = 1)
+
+```
+
+```{r}
+diff_seasonal <- diff(diff1, lag = 12)
+plot(diff_seasonal)
+adf.test(diff_seasonal)
+```
+
+
+```{r}
+acf(diff_seasonal)
+pacf(diff_seasonal)
+```
+lag 1 -> positive to autocorrelation 
+ACF spikes->  suggest MA(q) or MA(Q)
+PACF spikes -> suggest AR(p) or AR(P)
+
+```{r}
+library(forecast)
+
+model_sarima <- auto.arima(soi_ts)
+summary(model_sarima)
+```
+
+Diagnostic checking: 
+No autocorrelation in residuals (ACF) -> white noise
+Ljung-Box test p-value > 0.05
+data:  Residuals from ARIMA(1,0,1) with zero mean
+Q* = 16.228, df = 22, p-value = 0.8044
+Model df: 2.   Total lags used: 24
+
+The Ljung-Box test is a statistical diagnostic tool used in time series analysis to determine if residuals from a fitted model (ARIMA) are independently distributed, meaning they exhibit no significant autocorrelation, or if they behave as white noise. It tests the overall randomness of the data across multiple lags rather than a single lag
+{\displaystyle H_{0}}: The data is not correlated (i.e. the correlations in the population from which the sample is taken are 0, so that any observed correlations in the data result from randomness of the sampling process).
+{\displaystyle H_{a}}: The data exhibit serial correlation.
+```{r}
+checkresiduals(model_sarima)
+```
+
+
+After deciding on appropriate models, forecast the data into the future up to 5 time periods
+ahead and calculate 95% prediction intervals for each of the 5 forecasts.
+
+```{r}
+forecast_5 <- forecast(model_sarima, h = 5, level = 95)
+plot(forecast_5,
+     main = "SOI Forecast (5 steps ahead)",
+     ylab = "SOI",
+     xlab = "Time")
+```
+
+
+#Assigment 2
+```{r}
+library(readxl)
+
+EDP <- read_excel(
+  "C:/Users/X1605/OneDrive - IPLeiria/Ano_letivo_2025_26/master_ist/Time_Series_Analysis/project/EDP.xls",
+  skip = 3
+)
+
+GALP <- read_excel(
+  "C:/Users/X1605/OneDrive - IPLeiria/Ano_letivo_2025_26/master_ist/Time_Series_Analysis/project/GALP ENERGIA-NOM.xls",
+  skip = 3
+)
+
+MENGIL<-read_excel(
+  "C:/Users/X1605/OneDrive - IPLeiria/Ano_letivo_2025_26/master_ist/Time_Series_Analysis/project/MOTA ENGIL.xls",
+  skip = 3
+)
+
+MENGIL<-read_excel(
+  "C:/Users/X1605/OneDrive - IPLeiria/Ano_letivo_2025_26/master_ist/Time_Series_Analysis/project/MOTA ENGIL.xls",
+  skip = 3
+)
+
+Navigator<-read_excel(
+  "C:/Users/X1605/OneDrive - IPLeiria/Ano_letivo_2025_26/master_ist/Time_Series_Analysis/project/THE NAVIGATOR COMP.xls",
+  skip = 3
+)
+
+```
+
+
+# log-returns associated to teh daily closing valuesfor the 4 TS
+
+```{r}
+library(dplyr)
+
+EDP <- EDP %>%
+  arrange(Date) %>% 
+  mutate(log_return = log(Close / lag(Close)))
+```
+
+
+
+
+
+
