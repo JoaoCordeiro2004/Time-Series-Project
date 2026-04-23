@@ -53,7 +53,6 @@ plot(SOI$date, SOI$soi,
 Next, we handle the missing values in the Time Series
 
 ```{r}
-install.packages("imputeTS")
 library(imputeTS)
 
 ggplot_na_distribution(soi_ts)
@@ -62,15 +61,112 @@ ggplot_na_distribution(soi_ts)
 As we can see by the graph there are no missing values for this
 particular Time Series, therefore there was no need to impute the gaps.
 
-With the time series being compeletly clean, we want to fit a SARIMA
-model to be able to do a forecast. We proceed to decompose it into its
-Seasonal, Trend and Residual components. As per usual, we assume the
-cyclical component to be zero.
+With the time series being completely clean, we want to fit a SARIMA
+model to be able to do a forecast. For a first analysis, we do a STL
+decomposition of the original time series.
 
 ```{r}
 stl_soi <- stl(soi_ts, s.window = "per")
 
 plot(stl_soi)
+```
+
+There is no clear trend pattern, but there seems to be a seasonal
+component. Since this data originates from climate measures, we can
+expect a seasonal lag of 12 months. (????)
+
+To determine if the original time series needs any transformation, it is
+necessary to inspect if it is homogeneous. For that, we analyse the ACF
+and PACF, as well as run some statistical tests.
+
+```{r}
+library(tseries)
+acf(soi_ts, lag.max = 100)
+pacf(soi_ts, lag.max = 100)
+
+adf.test(soi_ts)
+pp.test(soi_ts)
+kpss.test(soi_ts)
+```
+
+Looking at the ACF function we can see a slow decay and a peak in the
+PACF function. Also, when the ADF test is considered we can conclude
+that we don't have enough information to reject the null hypothesis
+(not-stationary), but the PP and KPSS tests tell us the contrary.
+Therefore the provided data can't give a straightforward conclusion
+about the stationarity of time series.
+
+With this in mind, we consider some models where the data is transformed
+with difference and some without said difference and analyse them. We
+consider **d = 1** and **d = 0,** with **s=12**. Also, we consider a
+model with seasonal difference **D = 1** and **s = 12**.
+
+#### *Model with d=1, s=12* 
+
+#### *Q = 0 , P = 2 ,  p = 0 , q = 1 and D = 0.*
+
+```{r}
+library(tseries)
+library(forecast)
+
+soi_ts_1 <- diff(soi_ts, 1)
+
+auto.arima(soi_ts_1)
+
+plot.ts(soi_ts_1)
+
+acf(soi_ts_1, lag = 50)
+pacf(soi_ts_1, lag = 50)
+
+adf.test(soi_ts_1)
+pp.test(soi_ts_1)
+```
+
+#### *Model with d=0, s=12* 
+
+#### *Q = 1 , P = 2 , p = 2 , q = 1 and D = 0.*
+
+```{r}
+library(tseries)
+library(forecast)
+
+auto.arima(soi_ts)
+
+plot.ts(soi_ts)
+
+acf(soi_ts_1, lag = 50)
+pacf(soi_ts_1, lag = 50)
+```
+
+**Model with D = 1, s = 12.**
+
+**Q = 0 , P = 2 , q = 0 , p = 2 and d = 0**
+
+**Q = 0 , P = 2 , q = 1 , p = 1 and d = 0**
+
+```{r}
+
+soi_ts_2 = diff(soi_ts, 12)
+
+adf.test(soi_ts_2)
+pp.test(soi_ts_2)
+
+auto.arima(soi_ts_2)
+
+plot.ts(soi_ts_2)
+
+acf(soi_ts_2, lag = 50)
+pacf(soi_ts_2, lag = 50)
+
+```
+
+**ISTO A SEGUIR ESTÁ ERRADO!!!!**
+
+We proceed to decompose it into its Seasonal, Trend and Residual
+components. As per usual, we assume the cyclical component to be zero.
+
+```{r}
+
 ```
 
 ### Analysis of the Remainder Component
@@ -85,7 +181,7 @@ soi_rem <- stl_soi$time.series[,3]
 plot(soi_rem)
 ```
 
-Before proceding, we need to check if this time series is stationary.
+Before proceeding, we need to check if this time series is stationary.
 Otherwise, we couldn't proceed with the modelling.
 
 ```{r}
@@ -102,7 +198,7 @@ stationary.
 A SEGUIR DAR PLOT DAS ACF E PACF E TIRAR CONCLUSÕES. EXPLICAR NO
 RELATÓRIO TUDO DEPOIS!!!!
 
---------------------------------------------------------------------------------------
+------------------------------------------------------------------------
 
 ```{r}
 diff1 <- diff(soi_ts, differences = 1)
