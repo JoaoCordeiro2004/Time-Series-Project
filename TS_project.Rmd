@@ -33,21 +33,42 @@ colnames(SOI) <- c("date", "soi")
 SOI$date <- as.Date(paste0(SOI$date, "01"), format = "%Y%m%d")
 ```
 
-Afterwards, we create the time series for the data and plot it.
+Afterwards, we create the time series for the data and plot it. Also, we
+calculate some
 
 ```{r}
 soi_ts <- ts(SOI$soi,
              start = c(2010, 1),
              frequency = 12)
+
+media <- mean(soi_ts)
+sd <- sd(soi_ts)
+mediana <- median(soi_ts)
+lower_bound <- media - 1.96*sd(soi_ts)/sqrt(nrow(SOI))
+upper_bound <- media + 1.96*sd(soi_ts)/sqrt(nrow(SOI))
 ```
 
 ```{r}
-plot(SOI$date, SOI$soi,
-     type = "l",
-     main = "Southern Oscillation Index (SOI)",
-     xlab = "Time",
-     ylab = "SOI",
-     col = "blue")
+library(ggplot2)
+
+SOITS <- ggplot(SOI, aes(x = date, y = soi))+geom_line(col = "blue") + theme_bw() + labs(title = "Monthly Southern Oscillation Index (SOI)",subtitle = "Measured in (01/01/2010 - 01/12/2025)",x = "Time", y = "SOI") + theme(plot.background = element_blank(), panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+
+
+```
+
+```{r}
+library(ggplot2)
+
+ggplot(SOI, aes(x = date, y = soi)) +
+  geom_rect(aes(xmin = min(date), xmax= max(date), ymin = lower_bound, ymax = upper_bound), alpha = 0.1, fill = "lightblue") + 
+  geom_line(col = "blue") + 
+  theme_bw() +
+  labs(title = "Monthly Southern Oscillation Index (SOI)",subtitle = "Measured in (01/01/2010 - 01/12/2025)",x = "Time", y = "SOI") +
+  theme(plot.background = element_blank(), panel.grid.major = element_blank(), panel.grid.minor = element_blank()) +
+  geom_line(y = media, col = "darkblue") +
+  geom_line(y = lower_bound, col = "darkblue", linetype = "dashed"  ) +
+  geom_line(y = upper_bound, col = "darkblue", linetype = "dashed") 
+  
 ```
 
 Next, we handle the missing values in the Time Series
@@ -55,7 +76,11 @@ Next, we handle the missing values in the Time Series
 ```{r}
 library(imputeTS)
 
-ggplot_na_distribution(soi_ts)
+imputets <- ggplot_na_distribution(soi_ts, x_axis_labels = SOI$date, color_points = "blue", color_lines = "blue", theme_bw(), ylab = "SOI") +  theme(
+    plot.background = element_blank(),
+    panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+
+
 ```
 
 As we can see by the graph there are no missing values for this
@@ -67,62 +92,69 @@ decomposition of the original time series.
 
 ```{r}
 stl_soi <- stl(soi_ts, s.window = "per")
+stl_ts <- data.frame(stl_soi$time.series)
+stl_ts$date <- SOI$date
 
-plot(stl_soi)
+seasonal <- ggplot(data = stl_ts, aes(x = date, y = seasonal)) + geom_line(col = "blue") + 
+  theme_bw() +
+  labs(title = "Seasonal Component Southern Oscillation Index (SOI)",subtitle = "Measured in (01/01/2010 - 01/12/2025)",x = "Time", y = "SOI") +
+  theme(plot.background = element_blank(), panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+
+trend <- ggplot(data = stl_ts, aes(x = date, y = trend)) + geom_line(col = "blue") + 
+  theme_bw() +
+  labs(title = "Trend Component Southern Oscillation Index (SOI)",subtitle = "Measured in (01/01/2010 - 01/12/2025)",x = "Time", y = "SOI") +
+  theme(plot.background = element_blank(), panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+
+remainders <- ggplot(data = stl_ts, aes(x = date, y = remainder)) + geom_line(col = "blue") + 
+  theme_bw() +
+  labs(title = "Remainder Component Southern Oscillation Index (SOI)",subtitle = "Measured in (01/01/2010 - 01/12/2025)",x = "Time", y = "SOI") +
+  theme(plot.background = element_blank(), panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+
+#ggsave("seasonal.png", seasonal, width = 1877, height = 1181, units = "px")
+#ggsave("trend.png", trend, width = 1877, height = 1181, units = "px")
+#ggsave("remainders.png", remainders, width = 1877, height = 1181, units = "px")
 ```
 
 There is no clear trend pattern, but there seems to be a seasonal
 component. Since this data originates from climate measures, we can
-expect a seasonal lag of 12 months. (????)
+expect a seasonal lag of 12 months.
 
 To determine if the original time series needs any transformation, it is
 necessary to inspect if it is homogeneous. For that, we analyse the ACF
 and PACF, as well as run some statistical tests.
 
 ```{r}
+library(forecast)
 library(tseries)
-acf(soi_ts, lag.max = 100)
-pacf(soi_ts, lag.max = 100)
+ACF_SOI <- ggAcf(soi_ts, lag.max = 100)+ 
+  theme_bw() +
+  labs(title = "Autocorrelation Function of the SOI Time Series ",subtitle = "Lags from 0 to 100",x = "Lag", y = "") +
+  theme(plot.background = element_blank(), panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+PACF_SOI <- ggPacf(soi_ts, lag.max = 100)+ 
+  theme_bw() +
+  labs(title = "Partial Autocorrelation Function of the SOI Time Series ",subtitle = "Lags from 0 to 100",x = "Lag", y = "") +
+  theme(plot.background = element_blank(), panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+
+#ggsave("ACF.png", ACF_SOI, width = 1877, height = 1181, units = "px")
+#ggsave("PACF.png", PACF_SOI, width = 1877, height = 1181, units = "px")
 
 adf.test(soi_ts)
-pp.test(soi_ts)
 kpss.test(soi_ts)
 ```
 
 Looking at the ACF function we can see a slow decay and a peak in the
 PACF function. Also, when the ADF test is considered we can conclude
 that we don't have enough information to reject the null hypothesis
-(not-stationary), but the PP and KPSS tests tell us the contrary.
-Therefore the provided data can't give a straightforward conclusion
-about the stationarity of time series.
+(not-stationary), but the KPSS tests tell us the contrary. Therefore the
+provided data can't give a straightforward conclusion about the
+stationarity of time series.
 
 With this in mind, we consider some models where the data is transformed
 with difference and some without said difference and analyse them. We
 consider **d = 1** and **d = 0,** with **s=12**. Also, we consider a
 model with seasonal difference **D = 1** and **s = 12**.
 
-#### *Model with d=1, s=12* 
-
-#### *Q = 0 , P = 2 ,  p = 0 , q = 1 and D = 0.*
-
-```{r}
-library(tseries)
-library(forecast)
-
-soi_ts_1 <- diff(soi_ts, 1)
-
-auto.arima(soi_ts_1)
-
-plot.ts(soi_ts_1)
-
-acf(soi_ts_1, lag = 50)
-pacf(soi_ts_1, lag = 50)
-
-adf.test(soi_ts_1)
-pp.test(soi_ts_1)
-```
-
-#### *Model with d=0, s=12* 
+#### *Model with d=0, s=12*
 
 #### *Q = 1 , P = 2 , p = 2 , q = 1 and D = 0.*
 
@@ -134,8 +166,8 @@ auto.arima(soi_ts)
 
 plot.ts(soi_ts)
 
-acf(soi_ts_1, lag = 50)
-pacf(soi_ts_1, lag = 50)
+acf(soi_ts, lag = 50)
+pacf(soi_ts, lag = 50)
 ```
 
 **Model with D = 1, s = 12.**
@@ -145,58 +177,40 @@ pacf(soi_ts_1, lag = 50)
 **Q = 0 , P = 2 , q = 1 , p = 1 and d = 0**
 
 ```{r}
+soi_ts_2 = ts(diff(soi_ts, 12))
 
-soi_ts_2 = diff(soi_ts, 12)
+library(ggplot2)
+library(tseries)
+library(forecast)
+
+vec <- c(1:180)
+SOIDIFF = data.frame(vec,soi_ts_2)
+
+SOITS_diff <- ggplot(SOIDIFF, aes(x = vec, y = soi_ts_2))+ geom_line(col = "blue") + theme_bw() + labs(title = "Yearly Difference in Monthly Southern Oscillation Index (SOI)",subtitle = "Measured in (01/01/2010 - 01/12/2025)",x = "", y = "SOI") + theme(plot.background = element_blank(), panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+
+ACF_SOI_DIFF <- ggAcf(soi_ts_2, lag.max = 100)+ 
+  theme_bw() +
+  labs(title = "Autocorrelation Function of the Yearly Variation of the SOI time series ",subtitle = "Lags from 0 to 100",x = "Lag", y = "") +
+  theme(plot.background = element_blank(), panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+PACF_SOI_DIFF <- ggPacf(soi_ts_2, lag.max = 100)+ 
+  theme_bw() +
+  labs(title = "Partial Autocorrelation Function of the Yearly variation in the SOI time series. ",subtitle = "Lags from 0 to 100",x = "Lag", y = "") +
+  theme(plot.background = element_blank(), panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+
+#ggsave("SOIDIFF.png", SOITS_diff, width = 1877, height = 1181, units = "px")
+#ggsave("ACFDIFF.png", ACF_SOI_DIFF, width = 1877, height = 1181, units = "px")
+#ggsave("PACFDIFF.png", PACF_SOI_DIFF, width = 1877, height = 1181, units = "px")
+
 
 adf.test(soi_ts_2)
-pp.test(soi_ts_2)
+
+kpss.test(soi_ts_2)
 
 auto.arima(soi_ts_2)
 
-plot.ts(soi_ts_2)
-
-acf(soi_ts_2, lag = 50)
-pacf(soi_ts_2, lag = 50)
-
 ```
 
-**ISTO A SEGUIR ESTÁ ERRADO!!!!**
-
-We proceed to decompose it into its Seasonal, Trend and Residual
-components. As per usual, we assume the cyclical component to be zero.
-
-```{r}
-
-```
-
-### Analysis of the Remainder Component
-
-Having performed the STL decomposition, we can extract the remainder
-component of the SOI time series. The goal is to fit a SARIMA model to
-it.
-
-```{r}
-soi_rem <- stl_soi$time.series[,3]
-
-plot(soi_rem)
-```
-
-Before proceeding, we need to check if this time series is stationary.
-Otherwise, we couldn't proceed with the modelling.
-
-```{r}
-library(tseries)
-adf.test(soi_rem)
-kpss.test(soi_rem)
-```
-
-By Augmented Dickey-Fuller test (null hypothesis states that it is not
-stationary) and the KPSS test (null hypothesis states that the TS is
-stationary) we work with the hypothesis that the remainder component is
-stationary.
-
-A SEGUIR DAR PLOT DAS ACF E PACF E TIRAR CONCLUSÕES. EXPLICAR NO
-RELATÓRIO TUDO DEPOIS!!!!
+------------------------------------------------------------------------
 
 ------------------------------------------------------------------------
 
