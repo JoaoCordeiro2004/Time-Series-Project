@@ -253,17 +253,21 @@ summary(model5)
 ------------------------------------------------------------------------
 
 With all the models correctly characterized, the next step is to
-understan if these models are adequate fits to the original data set.
+understand if these models are adequate fits to the original data set.
 
-**Model 1**
+To do that, the residuals obtained from each model are analysed - that
+is, their normality will be examined through histograms and qqplots, and
+their autocorrelation will be tested with the Box-Ljung test.
 
 ```{r}
-m = 3 #insert what model to analyse
+m = 5 #insert what model to analyse
 model = paste0("model",m)
 
 library(forecast)
 
 res <- residuals(get(model))
+
+res <- res/sd(res)
 
 res_df <- data.frame(
   time = time(res),
@@ -271,29 +275,84 @@ res_df <- data.frame(
 )
 
 
-resmod3 <- ggplot(res_df, aes(x = time, y = residuals))+ geom_line(col = "blue") + theme_bw() + labs(title = paste("Residuals of Model", m, "in Monthly Southern Oscillation Index (SOI)"),subtitle = "Measured in (01/01/2010 - 01/12/2025)",x = "Date", y = "SOI") + theme(plot.background = element_blank(), panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+## ---------- Residuals TS + QQplots + Histograms --------------
 
-ACFmod3 <- ggAcf(res, lag.max = 100)+ 
-  theme_bw() +
-  labs(title = "Autocorrelation Function of the Yearly Variation of the SOI time series ",subtitle = "Lags from 0 to 100",x = "Lag", y = "") +
-  theme(plot.background = element_blank(), panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+resmod <- ggplot(res_df, aes(x = time, y = residuals))+ geom_line(col = "blue") + theme_bw() + labs(title = paste("Model", m, "Residuals in Monthly Southern Oscillation Index (SOI)"),subtitle = "Measured in (01/01/2010 - 01/12/2025)",x = "Date", y = "SOI") + theme(plot.background = element_blank(), panel.grid.major = element_blank(), panel.grid.minor = element_blank())
 
-histmod3 <- ggplot(res_df, aes(residuals)) +
+
+histmod <- ggplot(res_df, aes(residuals)) + theme_bw() +
   geom_histogram(aes(y = after_stat(density)),
                  bins = 30, fill = "blue", color = "darkblue") +
-  geom_density(color = "red", linewidth = 1) +
+  geom_density(color = "black", linewidth = 1) +
   labs(title = "Distribution of residuals",
-       x = "Residuals", y = "Density") + theme(plot.background = element_blank(), panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+       x = "Residuals", y = "Density") + theme(plot.background = element_blank(), panel.grid.major = element_blank(), panel.grid.minor = element_blank())+ theme(plot.margin = margin(10, 10, 10, 10))
 
 
-# VER SE ISTO FAZ SENTIDO!!!!
-#coisas = tsdiag(model1)
+QQmod <- ggplot(res_df, aes(sample = residuals)) + theme_bw() +
+  stat_qq(alpha = 0.6) +
+  stat_qq_line(color = "blue") +
+  labs(title = paste("Q-Q Plot"),
+       x = "Theoretical Quantiles",
+       y = "Std Residuals") + theme(plot.background = element_blank(), panel.grid.major = element_blank(), panel.grid.minor = element_blank())+ theme(plot.margin = margin(10, 10, 10, 10))
+
+#install.packages("cowplot")
+library(cowplot)
+
+row2 <- plot_grid( histmod, QQmod, ncol=2)
+
+plotfinal1 <- plot_grid(resmod, row2, ncol=1)
 
 
+##----------- ACF and Ljung-box Plots --------------
 
-View(coisas)
-Resid
-histmod3
+ACFmod <- ggAcf(res, lag.max = 100)+ 
+  theme_bw() +
+  labs(title = paste("ACF"),subtitle = "Lags from 0 to 100",x = "Lag", y = "") +
+  theme(plot.background = element_blank(), panel.grid.major = element_blank(), panel.grid.minor = element_blank())+ theme(plot.margin = margin(10, 10, 10, 10))
+
+#install.packages('LSTS')
+library(LSTS)
+
+Ljung_plot <- Box.Ljung.Test(res, lag = 25) + 
+  theme_bw() +
+  labs(title = paste("P-Values for Ljung-Box Test"),subtitle = "Lags from 0 to 25",x = "Lag", y = "") +
+  theme(plot.background = element_blank(), panel.grid.major = element_blank(), panel.grid.minor = element_blank())+ theme(plot.margin = margin(10, 10, 10, 10))
+
+plotfinal2 <- plot_grid(ACFmod, Ljung_plot, ncol=2)
+
+
+##--------- Compute \mu and test if it is 0 -----------------
+
+
+print(mean(res))
+
+#install.packages("BSDA")
+library(BSDA)
+
+SIGN.test(res, md = 0)
+
+
+#ggsave(paste0("Res_Analysis_Mod",m,".png"),plotfinal1, width = 1877, height = 1181, units = "px" )
+
+#ggsave(paste0("Corr_Analysis_Mod",m,".png"),plotfinal2, width = 2250, height = 1250, units = "px" )
+```
+
+The next step is to chose the best model and forecast the SOI time
+series' values in the next 5 time steps with a 95% confidence interval
+
+```{r}
+library(forecast)
+m = model4 #insert choosen model
+fore <- forecast(m, h=5, level = 95)
+
+forecast_plot <- autoplot(fore, fcol = "blue") + theme_bw() + labs(title = paste("Forecast of the SOI Values (First 5 Months of 2026)"),subtitle = "Measured in (01/01/2010 - 01/12/2025) - Forecast (01/01/2026 - 01/05/2026)",x = "Date", y = "SOI")+ theme(plot.background = element_blank(), panel.grid.major = element_blank(), panel.grid.minor = element_blank()) 
+
+
+fore$mean
+fore$lower
+fore$upper
+
+#ggsave(paste0("forecast_plot.png"),forecast_plot, width = 1877, height = 1181, units = "px" )
 
 ```
 
