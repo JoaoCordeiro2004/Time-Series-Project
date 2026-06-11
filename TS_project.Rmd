@@ -56,21 +56,6 @@ SOITS <- ggplot(SOI, aes(x = date, y = soi))+geom_line(col = "blue") + theme_bw(
 
 ```
 
-```{r}
-library(ggplot2)
-
-ggplot(SOI, aes(x = date, y = soi)) +
-  geom_rect(aes(xmin = min(date), xmax= max(date), ymin = lower_bound, ymax = upper_bound), alpha = 0.1, fill = "lightblue") + 
-  geom_line(col = "blue") + 
-  theme_bw() +
-  labs(title = "Monthly Southern Oscillation Index (SOI)",subtitle = "Measured in (01/01/2010 - 01/12/2025)",x = "Time", y = "SOI") +
-  theme(plot.background = element_blank(), panel.grid.major = element_blank(), panel.grid.minor = element_blank()) +
-  geom_line(y = media, col = "darkblue") +
-  geom_line(y = lower_bound, col = "darkblue", linetype = "dashed"  ) +
-  geom_line(y = upper_bound, col = "darkblue", linetype = "dashed") 
-  
-```
-
 Next, we handle the missing values in the Time Series
 
 ```{r}
@@ -403,41 +388,156 @@ plot(forecast_5,
 # Assigment 2
 
 ```{r}
+#install.packages('rio')
 library(readxl)
+library(rio)
 
-EDP <- read_excel(
-  "C:/Users/X1605/OneDrive - IPLeiria/Ano_letivo_2025_26/master_ist/Time_Series_Analysis/project/EDP.xls",
-  skip = 3
-)
+EDP <- import("https://raw.githubusercontent.com/JoaoCordeiro2004/Time-Series-Project/main/EDP.xls", skip = 3)
 
-GALP <- read_excel(
-  "C:/Users/X1605/OneDrive - IPLeiria/Ano_letivo_2025_26/master_ist/Time_Series_Analysis/project/GALP ENERGIA-NOM.xls",
-  skip = 3
-)
 
-MENGIL<-read_excel(
-  "C:/Users/X1605/OneDrive - IPLeiria/Ano_letivo_2025_26/master_ist/Time_Series_Analysis/project/MOTA ENGIL.xls",
-  skip = 3
-)
+GALP <- import(
+  "https://raw.githubusercontent.com/JoaoCordeiro2004/Time-Series-Project/main/GALP%20ENERGIA-NOM.xls", skip = 3)
 
-MENGIL<-read_excel(
-  "C:/Users/X1605/OneDrive - IPLeiria/Ano_letivo_2025_26/master_ist/Time_Series_Analysis/project/MOTA ENGIL.xls",
-  skip = 3
-)
+MENGIL<-import(
+  "https://raw.githubusercontent.com/JoaoCordeiro2004/Time-Series-Project/main/MOTA%20ENGIL.xls", skip = 3)
 
-Navigator<-read_excel(
-  "C:/Users/X1605/OneDrive - IPLeiria/Ano_letivo_2025_26/master_ist/Time_Series_Analysis/project/THE NAVIGATOR COMP.xls",
-  skip = 3
-)
+Navigator<-import(
+  "https://raw.githubusercontent.com/JoaoCordeiro2004/Time-Series-Project/main/THE%20NAVIGATOR%20COMP.xls", skip = 3)
 
 ```
 
-## Log-returns associated to the daily closing values for the 4 TS
+Next, the log returns associated with each time series were calculated
+and added to the data frame
 
 ```{r}
 library(dplyr)
+library(ggplot2)
+library(cowplot)
 
 EDP <- EDP %>%
   arrange(Date) %>% 
   mutate(log_return = log(Close / lag(Close)))
+
+GALP <- GALP %>%
+  arrange(Date) %>% 
+  mutate(log_return = log(Close / lag(Close)))
+
+MENGIL <- MENGIL %>%
+  arrange(Date) %>% 
+  mutate(log_return = log(Close / lag(Close)))
+
+Navigator <- Navigator %>%
+  arrange(Date) %>% 
+  mutate(log_return = log(Close / lag(Close)))
+
+
+EDP_ts <- ts(EDP$log_return)[-1]
+
+GALP_ts <- ts(GALP$log_return)[-1]
+
+MENGIL_ts <- ts(MENGIL$log_return)[-1]
+
+Navigator_ts <- ts(Navigator$log_return)[-1]
+
+
+```
+
+Plot the daily closing values for each stock considered and the daily
+returns - the imputeTS package was considered to check if there are any
+missing values in the time series.
+
+```{r}
+
+library(ggplot2)
+library(imputeTS)
+library(cowplot)
+
+
+#Plot the original dataset vs the returns data set
+
+data_stocks = "GALP"
+
+plt1 <- ggplot(get(data_stocks), aes(x = Date, y = Close)) + geom_line(col = "blue") + theme_bw() + labs(title = paste("Daily Closing Values for the",data_stocks,"Stock"),subtitle = "Measured in (24/02/2025 - 26/01/2026)",x = "Date", y = paste(data_stocks," Closing Values")) + theme(plot.background = element_blank(), panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+  
+
+plt2 <- ggplot_na_distribution(get(paste0(data_stocks,"_ts"))) + geom_line(col = "blue") + theme_bw() + labs(title = paste("Daily Log Return Values for the ",data_stocks," Stock"),subtitle = "Measured in (25/02/2025 - 26/01/2026)",x = "Date", y = paste(data_stocks,"Return Values")) + theme(plot.background = element_blank(), panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+
+
+plot_final <- plot_grid(plt1,plt2, nrow=2)
+
+plot_final
+
+#ggsave(paste0("ClosevsReturn",data_stocks,".png"),plot_final, width = 2250, height = 1250, units = "px" )
+```
+
+Next, some statistics about the time series were considered, as well as
+its empirical distribution.
+
+```{r}
+#install.packages('psych')
+library(psych)
+
+
+describe(get(paste0(data_stocks,"_ts")))
+
+ggplot(get(data_stocks), aes(log_return)) + theme_bw() +
+  geom_histogram(aes(y = after_stat(density)),
+                 bins = 30, fill = "blue", color = "darkblue") +
+  geom_density(color = "black", linewidth = 1, y = 'log_return') +
+  labs(title = paste("Distribution of",data_stocks,"'s Log-Return Values"),
+       x = "Log-Returns", y = "Density") + theme(plot.background = element_blank(), panel.grid.major = element_blank(), panel.grid.minor = element_blank())+ theme(plot.margin = margin(10, 10, 10, 10))
+
+
+```
+
+In order to fit a GARCH type model to the data, it needs to be
+stationary and it is also white noise. Therefore, data was tested for
+stationarity, strong whiteness and weak whiteness.
+
+```{r}
+# Stationarity
+
+library(tseries)
+library(forecast)
+library(sarima)
+
+adf.test(get(paste0(data_stocks,"_ts")))
+kpss.test(get(paste0(data_stocks,"_ts")))
+
+#The data was tested for fully white noise behaviour iid and a weaker version, compatible with GARCH - uncorrelated white noise.
+
+library(LSTS)
+
+#Strong White Noise
+BoxtestWN <- Box.Ljung.Test(get(paste0(data_stocks,"_ts")), lag = 25) + 
+  theme_bw() +
+  labs(title = paste("P-Values for Ljung-Box Test"),subtitle = "Lags from 0 to 25",x = "Lag", y = "") +
+  theme(plot.background = element_blank(), panel.grid.major = element_blank(), panel.grid.minor = element_blank())+ theme(plot.margin = margin(10, 10, 10, 10))
+ 
+#Weak White Noise
+
+autocorr <- autocorrelations(get(paste0(data_stocks,"_ts")))
+ 
+wwn <- acfGarchTest(autocorr,get(paste0(data_stocks,"_ts")),nlags=(1:25))
+ 
+WWNtest <- ggplot(wwn$test, aes(x = h, y = pval)) + geom_point() + geom_hline(yintercept=0.05, color = "blue") + theme_bw() +
+  labs(title = paste("P-Values for Weak White Noise Test"),subtitle = "Lags from 0 to 25",x = "Lag", y = "") +
+  theme(plot.background = element_blank(), panel.grid.major = element_blank(), panel.grid.minor = element_blank()) + theme(plot.margin = margin(10, 10, 10, 10))
+
+
+plot_grid(WWNtest, BoxtestWN, nrow=2) 
+
+
+#Plot Sample-ACF
+ 
+acf(get(paste0(data_stocks,"_ts")))
+```
+
+Next, a LM test was performed to test conditional heteroscedasticity
+
+```{r}
+#install.packages('FinTS')
+library(FinTS)
+
+ArchTest(get(paste0(data_stocks,"_ts")), lags = 10)
 ```
