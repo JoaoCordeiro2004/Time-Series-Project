@@ -34,7 +34,7 @@ SOI$date <- as.Date(paste0(SOI$date, "01"), format = "%Y%m%d")
 ```
 
 Afterwards, we create the time series for the data and plot it. Also, we
-calculate some
+calculate some of its basic statistics for the time series data.
 
 ```{r}
 soi_ts <- ts(SOI$soi,
@@ -51,9 +51,9 @@ upper_bound <- media + 1.96*sd(soi_ts)/sqrt(nrow(SOI))
 ```{r}
 library(ggplot2)
 
-SOITS <- ggplot(SOI, aes(x = date, y = soi))+geom_line(col = "blue") + theme_bw() + labs(title = "Monthly Southern Oscillation Index (SOI)",subtitle = "Measured in (01/01/2010 - 01/12/2025)",x = "Time", y = "SOI") + theme(plot.background = element_blank(), panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+SOITS <- ggplot(SOI, aes(x = date, y = soi))+geom_line(col = "#5094cd") + theme_bw() + labs(title = "Monthly Southern Oscillation Index (SOI)",subtitle = "Measured in (01/01/2010 - 01/12/2025)",x = "Time", y = "SOI") + theme(plot.background = element_blank(), panel.grid.major = element_blank(), panel.grid.minor = element_blank())
 
-
+#ggsave("SOITS.png", SOITS, width = 1877, height = 1181, units = "px")
 ```
 
 Next, we handle the missing values in the Time Series
@@ -61,11 +61,11 @@ Next, we handle the missing values in the Time Series
 ```{r}
 library(imputeTS)
 
-imputets <- ggplot_na_distribution(soi_ts, x_axis_labels = SOI$date, color_points = "blue", color_lines = "blue", theme_bw(), ylab = "SOI") +  theme(
+imputets <- ggplot_na_distribution(soi_ts, x_axis_labels = SOI$date, color_points = "#5094cd", color_lines = "#5094cd", theme_bw(), ylab = "SOI") +  theme(
     plot.background = element_blank(),
     panel.grid.major = element_blank(), panel.grid.minor = element_blank())
 
-
+#ggsave("imputetest.png", imputets, width = 1877, height = 1181, units = "px")
 ```
 
 As we can see by the graph there are no missing values for this
@@ -80,20 +80,22 @@ stl_soi <- stl(soi_ts, s.window = "per")
 stl_ts <- data.frame(stl_soi$time.series)
 stl_ts$date <- SOI$date
 
-seasonal <- ggplot(data = stl_ts, aes(x = date, y = seasonal)) + geom_line(col = "blue") + 
+seasonal <- ggplot(data = stl_ts, aes(x = date, y = seasonal)) + geom_line(col = "#5094cd") + 
   theme_bw() +
   labs(title = "Seasonal Component Southern Oscillation Index (SOI)",subtitle = "Measured in (01/01/2010 - 01/12/2025)",x = "Time", y = "SOI") +
   theme(plot.background = element_blank(), panel.grid.major = element_blank(), panel.grid.minor = element_blank())
 
-trend <- ggplot(data = stl_ts, aes(x = date, y = trend)) + geom_line(col = "blue") + 
+trend <- ggplot(data = stl_ts, aes(x = date, y = trend)) + geom_line(col = "#5094cd") + 
   theme_bw() +
   labs(title = "Trend Component Southern Oscillation Index (SOI)",subtitle = "Measured in (01/01/2010 - 01/12/2025)",x = "Time", y = "SOI") +
   theme(plot.background = element_blank(), panel.grid.major = element_blank(), panel.grid.minor = element_blank())
 
-remainders <- ggplot(data = stl_ts, aes(x = date, y = remainder)) + geom_line(col = "blue") + 
+remainders <- ggplot(data = stl_ts, aes(x = date, y = remainder)) + geom_col(col = "#5094cd") + 
   theme_bw() +
   labs(title = "Remainder Component Southern Oscillation Index (SOI)",subtitle = "Measured in (01/01/2010 - 01/12/2025)",x = "Time", y = "SOI") +
   theme(plot.background = element_blank(), panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+
+
 
 #ggsave("seasonal.png", seasonal, width = 1877, height = 1181, units = "px")
 #ggsave("trend.png", trend, width = 1877, height = 1181, units = "px")
@@ -111,14 +113,16 @@ and PACF, as well as run some statistical tests.
 ```{r}
 library(forecast)
 library(tseries)
-ACF_SOI <- ggAcf(soi_ts, lag.max = 100)+ 
+ACF_SOI <- ggAcf(soi_ts, lag.max = 48)+ 
   theme_bw() +
-  labs(title = "Autocorrelation Function of the SOI Time Series ",subtitle = "Lags from 0 to 100",x = "Lag", y = "") +
+  labs(title = "Empirical Autocorrelation Function of the SOI Time Series ",subtitle = "Lags from 0 to 100",x = "Lag", y = "") +
   theme(plot.background = element_blank(), panel.grid.major = element_blank(), panel.grid.minor = element_blank())
-PACF_SOI <- ggPacf(soi_ts, lag.max = 100)+ 
+PACF_SOI <- ggPacf(soi_ts, lag.max = 48)+ 
   theme_bw() +
-  labs(title = "Partial Autocorrelation Function of the SOI Time Series ",subtitle = "Lags from 0 to 100",x = "Lag", y = "") +
+  labs(title = "Empirical Partial Autocorrelation Function of the SOI Time Series ",subtitle = "Lags from 0 to 100",x = "Lag", y = "") +
   theme(plot.background = element_blank(), panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+
+ACF_SOI
 
 #ggsave("ACF.png", ACF_SOI, width = 1877, height = 1181, units = "px")
 #ggsave("PACF.png", PACF_SOI, width = 1877, height = 1181, units = "px")
@@ -132,12 +136,12 @@ PACF function. Also, when the ADF test is considered we can conclude
 that we don't have enough information to reject the null hypothesis
 (not-stationary), but the KPSS tests tell us the contrary. Therefore the
 provided data can't give a straightforward conclusion about the
-stationarity of time series.
+stationarity of the time series.
 
 With this in mind, we consider some models where the data is transformed
 with difference and some without said difference and analyse them. We
-consider **d = 1** and **d = 0,** with **s=12**. Also, we consider a
-model with seasonal difference **D = 1** and **s = 12**.
+consider **d = 0,** with **s=12** and a model with seasonal difference
+**D = 1** and **s = 12**.
 
 #### *Model with d=0, s=12*
 
@@ -145,7 +149,7 @@ model with seasonal difference **D = 1** and **s = 12**.
 
 #### *Q = 2 , P = 2 , p = 2 , q = 1 and D = 0.*
 
-#### *Q = 1 , P = 2 , p = 2 , q = 1 and D = 0.*
+#### *Q = 1 , P = 2 , p = 2 , q = 2 and D = 0.*
 
 ```{r}
 library(tseries)
@@ -175,17 +179,17 @@ library(forecast)
 vec <- seq(as.Date("2011-01-01"), as.Date("2025-12-01"), by="months")
 SOIDIFF = data.frame(vec,soi_ts_2)
 
-SOITS_diff <- ggplot(SOIDIFF, aes(x = vec, y = soi_ts_2))+ geom_line(col = "blue") + theme_bw() + labs(title = "Yearly Difference in Monthly Southern Oscillation Index (SOI)",subtitle = "Measured in (01/01/2010 - 01/12/2025)",x = "Date", y = "SOI") + theme(plot.background = element_blank(), panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+SOITS_diff <- ggplot(SOIDIFF, aes(x = vec, y = soi_ts_2))+ geom_line(col = "#5094cd") + theme_bw() + labs(title = "Yearly Difference in Monthly Southern Oscillation Index (SOI)",subtitle = "Measured in (01/01/2010 - 01/12/2025)",x = "Date", y = "SOI") + theme(plot.background = element_blank(), panel.grid.major = element_blank(), panel.grid.minor = element_blank())
 
 SOITS_diff
 
-ACF_SOI_DIFF <- ggAcf(soi_ts_2, lag.max = 100)+ 
+ACF_SOI_DIFF <- ggAcf(soi_ts_2, lag.max = 48)+ 
   theme_bw() +
-  labs(title = "Autocorrelation Function of the Yearly Variation of the SOI time series ",subtitle = "Lags from 0 to 100",x = "Lag", y = "") +
+  labs(title = "Empirical Autocorrelation Function of the Yearly Variation of the SOI time series ",subtitle = "Lags from 0 to 100",x = "Lag", y = "") +
   theme(plot.background = element_blank(), panel.grid.major = element_blank(), panel.grid.minor = element_blank())
-PACF_SOI_DIFF <- ggPacf(soi_ts_2, lag.max = 100)+ 
+PACF_SOI_DIFF <- ggPacf(soi_ts_2, lag.max = 48)+ 
   theme_bw() +
-  labs(title = "Partial Autocorrelation Function of the Yearly variation in the SOI time series. ",subtitle = "Lags from 0 to 100",x = "Lag", y = "") +
+  labs(title = "Empirical Partial Autocorrelation Function of the Yearly variation in the SOI time series. ",subtitle = "Lags from 0 to 100",x = "Lag", y = "") +
   theme(plot.background = element_blank(), panel.grid.major = element_blank(), panel.grid.minor = element_blank())
 
 #ggsave("SOIDIFF.png", SOITS_diff, width = 1877, height = 1181, units = "px")
@@ -221,7 +225,7 @@ summary(model2)
 
 #Model 3 (2,0,1)x(2,0,1)[12]
 
-model3 <- Arima(soi_ts, order = c(2,0,1), seasonal = c(2,0,1))
+model3 <- Arima(soi_ts, order = c(2,0,2), seasonal = c(2,0,1))
 summary(model3)
 
 #Model 4 (2,0,2)x(3,1,4)[12]
@@ -242,7 +246,9 @@ understand if these models are adequate fits to the original data set.
 
 To do that, the residuals obtained from each model are analysed - that
 is, their normality will be examined through histograms and qqplots, and
-their autocorrelation will be tested with the Box-Ljung test.
+their whiteness will be tested with the Box-Ljung test.
+
+Besides that, the residuals will be testes for 0 mean and 1 variance.
 
 ```{r}
 m = 5 #insert what model to analyse
@@ -252,30 +258,30 @@ library(forecast)
 
 res <- residuals(get(model))
 
-res <- res/sd(res)
+res <- as.numeric(res/sqrt(get(model)$sigma2))
 
 res_df <- data.frame(
   time = time(res),
-  residuals = as.numeric(res)
+  residuals = res
 )
 
 
 ## ---------- Residuals TS + QQplots + Histograms --------------
 
-resmod <- ggplot(res_df, aes(x = time, y = residuals))+ geom_line(col = "blue") + theme_bw() + labs(title = paste("Model", m, "Residuals in Monthly Southern Oscillation Index (SOI)"),subtitle = "Measured in (01/01/2010 - 01/12/2025)",x = "Date", y = "SOI") + theme(plot.background = element_blank(), panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+resmod <- ggplot(res_df, aes(x = time, y = residuals))+ geom_col(col = "#5094cd") + theme_bw() + labs(title = paste("Model", m, "Residuals in Monthly Southern Oscillation Index (SOI)"),subtitle = "Measured in (01/01/2010 - 01/12/2025)",x = "Date", y = "SOI") + theme(plot.background = element_blank(), panel.grid.major = element_blank(), panel.grid.minor = element_blank())
 
 
 histmod <- ggplot(res_df, aes(residuals)) + theme_bw() +
   geom_histogram(aes(y = after_stat(density)),
-                 bins = 30, fill = "blue", color = "darkblue") +
-  geom_density(color = "black", linewidth = 1) +
+                 bins = 30, fill = "#5094cd", color = "darkblue") +
+  geom_density(color = "black", linewidth = 1, linetype = "dashed") +
   labs(title = "Distribution of residuals",
        x = "Residuals", y = "Density") + theme(plot.background = element_blank(), panel.grid.major = element_blank(), panel.grid.minor = element_blank())+ theme(plot.margin = margin(10, 10, 10, 10))
 
 
 QQmod <- ggplot(res_df, aes(sample = residuals)) + theme_bw() +
   stat_qq(alpha = 0.6) +
-  stat_qq_line(color = "blue") +
+  stat_qq_line(color = "#5094cd") +
   labs(title = paste("Q-Q Plot"),
        x = "Theoretical Quantiles",
        y = "Std Residuals") + theme(plot.background = element_blank(), panel.grid.major = element_blank(), panel.grid.minor = element_blank())+ theme(plot.margin = margin(10, 10, 10, 10))
@@ -290,9 +296,9 @@ plotfinal1 <- plot_grid(resmod, row2, ncol=1)
 
 ##----------- ACF and Ljung-box Plots --------------
 
-ACFmod <- ggAcf(res, lag.max = 100)+ 
+ACFmod <- ggAcf(res, lag.max = 48)+ 
   theme_bw() +
-  labs(title = paste("ACF"),subtitle = "Lags from 0 to 100",x = "Lag", y = "") +
+  labs(title = paste("ACF"),subtitle = "Lags from 0 to 48",x = "Lag", y = "") +
   theme(plot.background = element_blank(), panel.grid.major = element_blank(), panel.grid.minor = element_blank())+ theme(plot.margin = margin(10, 10, 10, 10))
 
 #install.packages('LSTS')
@@ -305,16 +311,19 @@ Ljung_plot <- Box.Ljung.Test(res, lag = 25) +
 
 plotfinal2 <- plot_grid(ACFmod, Ljung_plot, ncol=2)
 
+plotfinal1
 
 ##--------- Compute \mu and test if it is 0 -----------------
 
 
 print(mean(res))
+print(var(res))
 
-#install.packages("BSDA")
-library(BSDA)
+#install.packages("EnvStats")
+library(EnvStats)
 
-SIGN.test(res, md = 0)
+t.test(res, mu = 0)
+varTest(res)
 
 
 #ggsave(paste0("Res_Analysis_Mod",m,".png"),plotfinal1, width = 1877, height = 1181, units = "px" )
@@ -330,8 +339,9 @@ library(forecast)
 m = model4 #insert choosen model
 fore <- forecast(m, h=5, level = 95)
 
-forecast_plot <- autoplot(fore, fcol = "blue") + theme_bw() + labs(title = paste("Forecast of the SOI Values (First 5 Months of 2026)"),subtitle = "Measured in (01/01/2010 - 01/12/2025) - Forecast (01/01/2026 - 01/05/2026)",x = "Date", y = "SOI")+ theme(plot.background = element_blank(), panel.grid.major = element_blank(), panel.grid.minor = element_blank()) 
+forecast_plot <- autoplot(fore, fcol = "lightblue") + theme_bw() + labs(title = paste("Forecast of the SOI Values (First 5 Months of 2026)"),subtitle = "Measured in (01/01/2010 - 01/12/2025) - Forecast (01/01/2026 - 01/05/2026)",x = "Date", y = "SOI")+ theme(plot.background = element_blank(), panel.grid.major = element_blank(), panel.grid.minor = element_blank()) 
 
+forecast_plot
 
 fore$mean
 fore$lower
@@ -339,50 +349,6 @@ fore$upper
 
 #ggsave(paste0("forecast_plot.png"),forecast_plot, width = 1877, height = 1181, units = "px" )
 
-```
-
-#-------------------------------#
-
-lag 1 -\> positive to autocorrelation ACF spikes-\> suggest MA(q) or
-MA(Q) PACF spikes -\> suggest AR(p) or AR(P)
-
-```{r}
-library(forecast)
-
-model_sarima <- auto.arima(soi_ts)
-summary(model_sarima)
-```
-
-Diagnostic checking: No autocorrelation in residuals (ACF) -\> white
-noise Ljung-Box test p-value \> 0.05 data: Residuals from ARIMA(1,0,1)
-with zero mean Q\* = 16.228, df = 22, p-value = 0.8044 Model df: 2.
-Total lags used: 24
-
-The Ljung-Box test is a statistical diagnostic tool used in time series
-analysis to determine if residuals from a fitted model (ARIMA) are
-independently distributed, meaning they exhibit no significant
-autocorrelation, or if they behave as white noise. It tests the overall
-randomness of the data across multiple lags rather than a single lag
-{\displaystyle H\_{0}}: The data is not correlated (i.e. the
-correlations in the population from which the sample is taken are 0, so
-that any observed correlations in the data result from randomness of the
-sampling process). {\displaystyle H\_{a}}: The data exhibit serial
-correlation.
-
-```{r}
-checkresiduals(model_sarima)
-```
-
-After deciding on appropriate models, forecast the data into the future
-up to 5 time periods ahead and calculate 95% prediction intervals for
-each of the 5 forecasts.
-
-```{r}
-forecast_5 <- forecast(model_sarima, h = 5, level = 95)
-plot(forecast_5,
-     main = "SOI Forecast (5 steps ahead)",
-     ylab = "SOI",
-     xlab = "Time")
 ```
 
 # Assigment 2
