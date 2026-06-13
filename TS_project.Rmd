@@ -165,7 +165,7 @@ pacf(soi_ts, lag = 50)
 
 **Model with D = 1, s = 12.**
 
-**Q = 4 , P = 3 , q = 2 , p = 2 and d = 0**
+**Q = 1 , P = 2 , q = 0 , p = 2 and d = 0**
 
 **Q = 0 , P = 0 , q = 1 , p = 1 and d = 0**
 
@@ -215,7 +215,7 @@ library(tseries)
 
 #Model 1 (2,0,0)x(2,0,2)[12]
 
-model1 <- Arima(soi_ts, order = c(2,0,0), seasonal = c(2,0,2))
+model1 <- Arima(soi_ts, order = c(2,0,0), seasonal = c(2,0,0))
 summary(model1)
 
 #Model 2 (2,0,1)x(2,0,2)[12]
@@ -228,9 +228,9 @@ summary(model2)
 model3 <- Arima(soi_ts, order = c(2,0,2), seasonal = c(2,0,1))
 summary(model3)
 
-#Model 4 (2,0,2)x(3,1,4)[12]
+#Model 4 (2,0,0)x(2,1,2)[12]
 
-model4 <- Arima(soi_ts, order = c(2,0,2), seasonal = c(3,1,4))
+model4 <- Arima(soi_ts, order = c(2,0,0), seasonal = c(2,1,1))
 summary(model4)
 
 #Model 5 (1,0,1)x(0,1,0)[12]
@@ -255,6 +255,7 @@ m = 5 #insert what model to analyse
 model = paste0("model",m)
 
 library(forecast)
+library(ggplot2)
 
 res <- residuals(get(model))
 
@@ -311,7 +312,7 @@ Ljung_plot <- Box.Ljung.Test(res, lag = 25) +
 
 plotfinal2 <- plot_grid(ACFmod, Ljung_plot, ncol=2)
 
-plotfinal1
+plotfinal2
 
 ##--------- Compute \mu and test if it is 0 -----------------
 
@@ -421,7 +422,7 @@ library(cowplot)
 
 #Plot the original dataset vs the returns data set
 
-data_stocks = "GALP"
+data_stocks = "EDP"
 
 plt1 <- ggplot(get(data_stocks), aes(x = Date, y = Close)) + geom_line(col = "blue") + theme_bw() + labs(title = paste("Daily Closing Values for the",data_stocks,"Stock"),subtitle = "Measured in (24/02/2025 - 26/01/2026)",x = "Date", y = paste(data_stocks," Closing Values")) + theme(plot.background = element_blank(), panel.grid.major = element_blank(), panel.grid.minor = element_blank())
   
