@@ -15,6 +15,28 @@ This is the code document used to do the time series analysis in the
 context of the project from the Time Series course on IST-UL. The
 authors are João Cordeiro (ist1107480) and Susana Ferreira (ist59482).
 
+```{r}
+#Auxilliary Functions
+
+bootstrap_var <- function(var,x){
+  set.seed(12345)
+  B <- 10000
+  n <- length(x)
+  
+  # Center data and rescale to variance 1 under H0
+  x0 <- (x - mean(x)) / sd(x)
+  
+  boot.var <- replicate(B, {
+    xb <- sample(x0, n, replace = TRUE)
+    var(xb)
+  })
+  
+  pval <- mean(abs(boot.var - 1) >= abs(var(x) - 1))
+  
+  return(pval)
+}
+```
+
 # Assignment 1
 
 ## Southern Oscillation Index (SOI) since 2010 monthly data
@@ -424,13 +446,16 @@ library(cowplot)
 
 data_stocks = "EDP"
 
-plt1 <- ggplot(get(data_stocks), aes(x = Date, y = Close)) + geom_line(col = "blue") + theme_bw() + labs(title = paste("Daily Closing Values for the",data_stocks,"Stock"),subtitle = "Measured in (24/02/2025 - 26/01/2026)",x = "Date", y = paste(data_stocks," Closing Values")) + theme(plot.background = element_blank(), panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+plt1 <- ggplot(get(data_stocks), aes(x = Date, y = Close)) + geom_line(col = "#5094cd") + theme_bw() + labs(title = paste("Daily Closing Values for the",data_stocks,"Stock"),subtitle = "Measured in (24/02/2025 - 26/01/2026)",x = "Date", y = paste(data_stocks," Closing Values")) + theme(plot.background = element_blank(), panel.grid.major = element_blank(), panel.grid.minor = element_blank())
   
 
 plt2 <- ggplot_na_distribution(get(paste0(data_stocks,"_ts"))) + geom_line(col = "blue") + theme_bw() + labs(title = paste("Daily Log Return Values for the ",data_stocks," Stock"),subtitle = "Measured in (25/02/2025 - 26/01/2026)",x = "Date", y = paste(data_stocks,"Return Values")) + theme(plot.background = element_blank(), panel.grid.major = element_blank(), panel.grid.minor = element_blank())
 
 
 plot_final <- plot_grid(plt1,plt2, nrow=2)
+
+acf(get(paste0(data_stocks,"_ts")))
+pacf(get(paste0(data_stocks,"_ts")))
 
 plot_final
 
@@ -442,14 +467,20 @@ its empirical distribution.
 
 ```{r}
 #install.packages('psych')
+#install.packages('car')
 library(psych)
+library(car)
+library(timeDate)
+
+Data = get(paste0(data_stocks,"_ts"))
+describe(Data)
 
 
-describe(get(paste0(data_stocks,"_ts")))
+#Histograma dos Valores das Log Returns
 
 ggplot(get(data_stocks), aes(log_return)) + theme_bw() +
   geom_histogram(aes(y = after_stat(density)),
-                 bins = 30, fill = "blue", color = "darkblue") +
+                 bins = 30, fill = "#5094cd", color = "darkblue") +
   geom_density(color = "black", linewidth = 1, y = 'log_return') +
   labs(title = paste("Distribution of",data_stocks,"'s Log-Return Values"),
        x = "Log-Returns", y = "Density") + theme(plot.background = element_blank(), panel.grid.major = element_blank(), panel.grid.minor = element_blank())+ theme(plot.margin = margin(10, 10, 10, 10))
@@ -494,17 +525,204 @@ WWNtest <- ggplot(wwn$test, aes(x = h, y = pval)) + geom_point() + geom_hline(yi
 
 plot_grid(WWNtest, BoxtestWN, nrow=2) 
 
-
-#Plot Sample-ACF
- 
-acf(get(paste0(data_stocks,"_ts")))
 ```
 
-Next, a LM test was performed to test conditional heteroscedasticity
+Next, a LM test was performed to test conditional heteroscedasticity.
 
 ```{r}
 #install.packages('FinTS')
 library(FinTS)
 
-ArchTest(get(paste0(data_stocks,"_ts")), lags = 10)
+ArchTest(get(paste0(data_stocks,"_ts")), lags = 5)
+```
+
+This area is specific to the GALP time series
+
+```{r}
+
+#ESTÁ PROBLEMÁTICO... JÁ VOLTO
+
+library(fGarch)
+
+m1=garchFit(~garch(1,1),data=GALP_ts,trace=F, cond.dist = "std")
+summary(m1)
+
+ARIMAmodel <- arima(GALP_ts, order = c(2,0,3))
+
+ArchTest(residuals(ARIMAmodel)/sqrt(ARIMAmodel$sigma2), lags = 2)
+
+acf((residuals(ARIMAmodel)/ARIMAmodel$sigma2)^2)
+
+
+View(residuals(ARIMAmodel))
+```
+
+When the data set has proven to have a white noise pattern and have
+conditional heteroscedasticity it is ready to fit a model.
+
+Firstly, the ACF and PACF of the squared returns needs to be analysed to
+determine the order parameters $p$ and $q$ of the GARCH( $p$, $q$ ).
+
+Two types of models will be considered:\
+1) Purely ARCH models : ARCH(p)
+
+2)  GARCH models : GARCH(p,q) with 0\<p,q\<=2
+
+```{r}
+
+squared_ret <- (get(paste0(data_stocks,"_ts")))^2
+
+PACFret_squared <- ggPacf(squared_ret, lag.max = 50)+ 
+  theme_bw() +
+  labs(title = paste0("",data_stocks,"'s Squared Returns Empirical Partial Autocorrelation Function"),subtitle = "Lags from 0 to 50",x = "Lag", y = "") +
+  theme(plot.background = element_blank(), panel.grid.major = element_blank(), panel.grid.minor = element_blank())+ theme(plot.margin = margin(10, 10, 10, 10))
+
+
+PACFret_squared
+
+#ggsave(paste0("PADFret_squared_",data_stocks,".png"),PACFret_squared, width = 2250, height = 1250, units = "px" )
+```
+
+Having analysed the sample PACF of EDP, Navigator and MENGIL's squared
+returns, the following pure ARCH models are considered:
+
+-   EDP -\> ARCH(2)
+
+-   Navigator -\> ARCH(1)
+
+-   MENGIL -\> ARCH(1)
+
+Besides these models, the following dependence orders will be chosen for
+each company:
+
+-   GARCH(1,1)
+
+-   GARCH(1,2)
+
+-   GARCH(2,1)
+
+-   GARCH(2,2)
+
+```{r}
+
+#install.packages("rugarch")
+library(rugarch)
+
+Data = as.ts(get(paste0(data_stocks,"_ts")))
+
+if(data_stocks == "EDP"){
+  spec <- ugarchspec( variance.model = list( model = "sGARCH",  garchOrder = c(2,0)),
+  mean.model = list(armaOrder = c(0,0), include.mean = TRUE),
+  distribution.model = "sstd"
+)
+  Model1 <- ugarchfit(spec = spec, data = get(paste0(data_stocks,"_ts")))
+}
+if(data_stocks == "MENGIL"){
+  spec <- ugarchspec( variance.model = list( model = "sGARCH",  garchOrder = c(1,0)),
+  mean.model = list(armaOrder = c(0,0), include.mean = TRUE),
+  distribution.model = "sstd"
+)
+  Model1 <- ugarchfit(spec = spec, data = get(paste0(data_stocks,"_ts")))
+}
+if(data_stocks == "Navigator"){
+  spec <- ugarchspec( variance.model = list( model = "sGARCH",  garchOrder = c(1,0)),
+  mean.model = list(armaOrder = c(0,0), include.mean = TRUE),
+  distribution.model = "sstd"
+)
+  Model1 <- ugarchfit(spec = spec, data = get(paste0(data_stocks,"_ts")))
+}
+
+#GARCH(1,1)
+
+  spec <- ugarchspec( variance.model = list( model = "sGARCH",  garchOrder = c(1,1)),
+  mean.model = list(armaOrder = c(0,0), include.mean = TRUE),
+  distribution.model = "sstd"
+)
+
+Model2 <- ugarchfit(spec = spec, data = get(paste0(data_stocks,"_ts")))
+
+#GARCH(1,2)
+
+  spec <- ugarchspec( variance.model = list( model = "sGARCH",  garchOrder = c(1,2)),
+  mean.model = list(armaOrder = c(0,0), include.mean = TRUE),
+  distribution.model = "sstd"
+)
+
+Model3 <- ugarchfit(spec = spec, data = get(paste0(data_stocks,"_ts")))
+
+#GARCH(2,1)
+
+  spec <- ugarchspec( variance.model = list( model = "sGARCH",  garchOrder = c(2,1)),
+  mean.model = list(armaOrder = c(0,0), include.mean = TRUE),
+  distribution.model = "sstd"
+)
+
+Model4 <- ugarchfit(spec = spec, data = get(paste0(data_stocks,"_ts")))
+
+#GARCH(2,2)
+
+  spec <- ugarchspec( variance.model = list( model = "sGARCH",  garchOrder = c(2,2)),
+  mean.model = list(armaOrder = c(0,0), include.mean = TRUE),
+  distribution.model = "sstd"
+)
+
+Model5 <- ugarchfit(spec = spec, data = get(paste0(data_stocks,"_ts")))
+
+```
+
+Having all models correctly defined, the next step is to perform a
+diagnosis for each model's aptitude to fit the data.
+
+A good model should present residuals that are uncorrelated, whithout
+conditional heteroskedasticity, with zero mean and variance equal to
+one.
+
+```{r}
+
+#Choose which model to analyse m=1,...,5
+m = 4
+model = get(paste0("Model",m))
+
+std_residuals = as.vector(residuals(model, standardize = TRUE))
+
+std_res_df <- data.frame(
+  time = time(std_residuals),
+  residuals = std_residuals
+)
+
+Shape = as.numeric(model@fit$coef["shape"])
+Skew = as.numeric(model@fit$coef["skew"])
+
+#Compare Residuals with t-student
+
+
+
+QQmod <- ggplot(std_res_df, aes(sample = residuals)) + theme_bw() +
+  stat_qq(alpha = 0.6, distribution = qsstd, dparams = c(0,1,Shape, Skew)) +
+  stat_qq_line(color = "#5094cd", distribution = qsstd, dparams = c(0,1,Shape, Skew)) +
+  labs(title = paste("Model",m,"'s Q-Q Plot"),
+       x = "Theoretical Quantiles",
+       y = "Std Residuals") + theme(plot.background = element_blank(), panel.grid.major = element_blank(), panel.grid.minor = element_blank())+ theme(plot.margin = margin(10, 10, 10, 10))
+
+assign(paste0("QQmod",m), QQmod)
+
+QQmod
+
+#Calculate mean and variance to test if they are 0 and 1, respectively
+
+mean(std_residuals)
+var(std_residuals)
+
+t.test(std_residuals, mu=0)
+bootstrap_var(var(std_residuals), std_residuals)
+
+
+
+#P-values of Box-Ljung and LM tests
+#AIC and BIC values
+
+model
+
+QQ_final <- plot_grid(QQmod1, QQmod2, QQmod4, QQmod5, nrow=2)
+#ggsave(paste0("QQplot_",data_stocks,".png"),QQ_final, width = 2250, height = 1250, units = "px" )
 ```
