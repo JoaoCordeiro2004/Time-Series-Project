@@ -471,7 +471,10 @@ To avoid repeated code, a variable called data_stocks was created to
 define which company's stocks we are currently analysing
 
 ```{r}
-data_stocks = "MENGIL"
+
+#Choose company "EDP", "MENGIL", "Navigator", "GALP"
+
+data_stocks = "GALP"
 
 Time_Series = get(paste0(data_stocks,"_ts"))
 ```
@@ -485,20 +488,31 @@ library(imputeTS)
 library(cowplot)
 library(imputeTS)
 
+returns_df <- bind_rows(
+  EDP %>% mutate(Company = "EDP"),
+  GALP %>% mutate(Company = "GALP"),
+  MENGIL %>% mutate(Company = "Mota Engil"),
+  Navigator %>% mutate(Company = "Navigator")
+)
 
-plt2 <- ggplot_na_distribution(Time_Series) + geom_line(col = "blue") + theme_bw() + labs(title = paste("Daily Log Return Values for the ",data_stocks," Stock"),subtitle = "Measured in (25/02/2025 - 26/01/2026)",x = "Date", y = paste(data_stocks,"Return Values")) + theme(plot.background = element_blank(), panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+
+plot_all <- ggplot(returns_df, aes(x = Date, y = log_return)) +
+  geom_line(col ="#5094cd" ) +
+  facet_wrap(~ Company, ncol = 2) +
+  labs(
+    title = "Daily Log Returns",
+    x = "Date",
+    y = "Log Return"
+  )+ theme_bw() + labs(title = paste("Daily Closing Log Return Values"),subtitle = "Measured in (25/02/2025 - 26/01/2026)",x = "Date", y = paste("Return Values")) + theme(plot.background = element_blank(), panel.grid.major = element_blank(), panel.grid.minor = element_blank())
 
 
-plot_final <- plot_grid(plt1,plt2, nrow=2)
-
-plot_final
 
 acf(Time_Series)
 pacf(Time_Series)
 
-plot_final
+plot_all
 
-#ggsave(paste0("ClosevsReturn",data_stocks,".png"),plot_final, width = 2250, height = 1250, units = "px" )
+#ggsave("return_plot.png",plot_all, width = 2250, height = 1250, units = "px" )
 ```
 
 Next, some statistics about the time series were considered, as well as
@@ -603,7 +617,7 @@ Ljung_plot_GALP <- Box.Ljung.Test(residuals, lag = 25) +
 
 plotfinal2 <- plot_grid(ACF_GALP, Ljung_plot_GALP, ncol=2)
 
-plotfinal2
+#ggsave(paste0("PlotFinal",data_stocks,".png"),plotfinal2, width = 2250, height = 1250, units = "px" )
 
 ```
 
@@ -711,7 +725,7 @@ spec <- ugarchspec( variance.model = list( model = "sGARCH",  garchOrder = var_p
   distribution.model = dist
 )
 
-Model2 <- ugarchfit(spec = spec, data = Time_Series)
+  Model2 <- ugarchfit(spec = spec, data = Time_Series)
 
 #GARCH(1,2)
 
@@ -720,7 +734,7 @@ Model2 <- ugarchfit(spec = spec, data = Time_Series)
   distribution.model = dist
 )
 
-Model3 <- ugarchfit(spec = spec, data = Time_Series)
+  Model3 <- ugarchfit(spec = spec, data = Time_Series)
 
 #GARCH(2,1)
 
@@ -729,7 +743,7 @@ Model3 <- ugarchfit(spec = spec, data = Time_Series)
   distribution.model = dist
 )
 
-Model4 <- ugarchfit(spec = spec, data = Time_Series)
+  Model4 <- ugarchfit(spec = spec, data = Time_Series)
 
 #GARCH(2,2)
 
